@@ -1,4 +1,9 @@
 ---
+- name: Update dnf cache
+  dnf:
+    update_cache: yes
+  become: yes
+
 - name: Install Docker (Amazon Linux)
   dnf:
     name: docker
