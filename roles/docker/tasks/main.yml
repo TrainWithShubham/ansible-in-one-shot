@@ -2,12 +2,6 @@
 - name: Include OS-specific Docker installation
   include_tasks: "install_{{ ansible_distribution | lower | replace(' ', '_') }}.yml"
 
-- name: Start and enable Docker
-  service:
-    name: docker
-    state: started
-    enabled: "{{ docker_service_enabled }}"
-  become: yes
 
 - name: Add users to docker group
   user:
