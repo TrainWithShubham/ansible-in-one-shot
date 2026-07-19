@@ -1,0 +1,58 @@
+- name: Install packages With Blocks
+  hosts: workers
+  become: true
+
+  vars_files:
+    - vars/packages.yml
+
+  tasks:
+    - name: Ubuntu Specific Tasks 
+      block:
+        - name: Update Cache
+          apt:
+             update_cache: true
+        - name: Install Docker
+          apt:
+            name: docker.io
+            state: present
+      when: ansible_facts['distribution'] == "Ubuntu"
+
+
+    - name: Amazon Specific Tasks
+      block:
+        - name: Update Cache
+          dnf:
+            update_cache: true
+
+        - name: Install docker
+          dnf:
+            name: docker
+            state: present
+
+      when: ansible_facts['distribution'] == "Amazon" 
+
+    - name: RedHat Specific Tasks
+      block:
+        - name: Update Cache
+          dnf:
+            update_cache: true
+
+        - name: Install dnf plugins
+          dnf:
+            name: dnf-plugins-core
+            state: present
+        - name: Add Docker Repo
+          shell:
+            cmd: dnf config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo
+
+        - name: Install Docker
+          dnf:
+            name: docker-ce
+            state: present
+      when: ansible_facts['distribution'] == "RedHat"
+
+    - name: Install common packages
+      package:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ base_packages }}"
