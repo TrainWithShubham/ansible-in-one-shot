@@ -30,7 +30,37 @@
     state: present
   become: true
 
-- name: Configure Docker to use nftables
+# Docker's bridge network needs the xt_addrtype kernel module. It ships in
+# kernel-modules-extra, and a plain `dnf update` installs the newest kernel
+# without rebooting into it, so the RUNNING kernel may not have the module and
+# dockerd fails with "Extension addrtype ... missing kernel module".
+- name: Install kernel-modules-extra (netfilter modules Docker needs)
+  dnf:
+    name: kernel-modules-extra
+    state: present
+  become: true
+
+- name: Check the running kernel has xt_addrtype
+  command: modinfo xt_addrtype
+  register: docker_addrtype
+  changed_when: false
+  failed_when: false
+
+- name: Reboot into the newest kernel if xt_addrtype is missing
+  reboot:
+    reboot_timeout: 600
+  become: true
+  when: docker_addrtype.rc != 0
+
+- name: Re-check xt_addrtype after any reboot
+  command: modinfo xt_addrtype
+  register: docker_addrtype_after
+  changed_when: false
+  failed_when: false
+
+# Fallback only: with iptables disabled Docker no longer manages NAT, so port
+# publishing and outbound container traffic break. Skipped when the module exists.
+- name: Configure Docker to use nftables (fallback)
   copy:
     content: |
       {
@@ -39,6 +69,7 @@
     dest: /etc/docker/daemon.json
     mode: '0644'
   become: true
+  when: docker_addrtype_after.rc != 0
 
 - name: Start and enable containerd
   service:
