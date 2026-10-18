@@ -85,6 +85,11 @@ Each module has its own README with commands to run.
 
 **Total: ~4 hours** including ~20m setup and Q&A/buffer.
 
+Learning on your own? Follow the [7-day Study Checklist](STUDY_CHECKLIST.md): a daily
+assignment per module, with "break it on purpose" exercises and a capstone. For reference, see the
+[ad-hoc commands cheat sheet](docs/adhoc-cheatsheet.md) and
+[manual setup walkthrough](docs/manual-setup-under-the-hood.md).
+
 ---
 
 ## Infrastructure
@@ -127,7 +132,9 @@ ansible-in-one-shot/
 │   ├── group_vars/                # all, ubuntu, redhat, amazon
 │   └── host_vars/                 # control-node-ubuntu
 ├── roles/                         # common, docker, nginx
-└── modules/                       # 6 learning modules (start here!)
+├── modules/                       # 6 learning modules (start here!)
+├── docs/                          # Ad-hoc cheat sheet, manual setup walkthrough
+└── STUDY_CHECKLIST.md             # 7-day self-paced assignment
 ```
 
 ---
@@ -160,6 +167,19 @@ ansible-playbook modules/01-basics/03_install_packages.yml --check
 ansible-lint
 ```
 
+### Validate a playbook before you run it
+
+```bash
+ansible-playbook <file>.yml --syntax-check   # YAML and structure only, no connection to hosts
+ansible-playbook <file>.yml --list-hosts     # which hosts it will touch
+ansible-playbook <file>.yml --list-tasks     # which tasks it will run
+ansible-playbook <file>.yml --check --diff   # dry run, shows file changes
+ansible-playbook <file>.yml                  # run it again afterwards: expect changed=0
+```
+
+There is no `--validate` flag. Use `--syntax-check`. See the
+[cheat sheet](docs/adhoc-cheatsheet.md) for host patterns such as `'workers:&ubuntu'` and `--limit`.
+
 ---
 
 ## Troubleshooting
@@ -172,6 +192,12 @@ ansible-lint
 | Workers `UNREACHABLE` from control node | Key must be at `~/keys/terra-key-ansible` on the control node; workers' SG must allow port 22 (it allows intra-VPC by default) |
 | `couldn't resolve module community.general.*` | Run `ansible-galaxy collection install -r requirements.yml` |
 | `become: permission denied` | Default EC2 users have sudo — check your `hosts` line |
+| Ad-hoc `dnf`/`apt` command fails with a permissions error | `ansible.cfg` sets `become = False`. Add `-b`, e.g. `ansible redhat -b -a "dnf update -y"` |
+| `ansible servers:node-1 ...` hits more hosts than expected | `:` is a union. Use the host name alone, `'group:&host'`, or `--limit`. See the [cheat sheet](docs/adhoc-cheatsheet.md#host-patterns) |
+| `object of type 'dict' has no attribute 'ansible_distribution'` | Keys inside `ansible_facts` have no `ansible_` prefix: use `ansible_facts['distribution']` |
+| Docker fails to start on RHEL: `Extension addrtype ... missing kernel module` | The running kernel lacks `xt_addrtype` (a kernel update was installed but not booted into). The `docker` role installs `kernel-modules-extra` and reboots if needed. By hand: `sudo dnf install -y kernel-modules-extra && sudo reboot`, then `sudo systemctl reset-failed docker && sudo systemctl start docker` |
+| `Start request repeated too quickly` for a service | systemd rate-limited the restarts. Fix the cause, then run `systemctl reset-failed <service>` before starting it again |
+| `ansible-playbook: error: unrecognized arguments: --validate` | The flag is `--syntax-check` |
 
 ---
 
